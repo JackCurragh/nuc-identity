@@ -59,10 +59,14 @@ def cross_gene_views(members: pd.DataFrame, outdir: Path, prefix: str):
     if pairs:
         pd.DataFrame(pairs).to_csv(outdir / f'{prefix}_cross_gene_pairs.tsv', sep='\t', index=False)
 
-def write_html(copy_sum: pd.DataFrame, out_html: Path):
+def write_html(copy_sum: pd.DataFrame, exact_sum: pd.DataFrame, out_html: Path):
     html = []
     html.append('<html><head><meta charset="utf-8"><style>body{font:14px system-ui} table{border-collapse:collapse} td,th{border:1px solid #ddd;padding:4px} h2{margin-top:1.5em}</style></head><body>')
     html.append('<h1>Nucleotide Similarity Clusters</h1>')
+    if not exact_sum.empty:
+        html.append('<h2>Exact duplicates</h2>')
+        html.append(f'<p>Total clusters: <b>{exact_sum.shape[0]}</b></p>')
+        html.append(exact_sum.sort_values(["n_transcripts","n_genes"], ascending=False).head(100).to_html(index=False, escape=False))
     if not copy_sum.empty:
         html.append(f'<h2>Near-identical (copy-like)</h2>')
         html.append(f'<p>Total clusters: <b>{copy_sum.shape[0]}</b></p>')
@@ -74,11 +78,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--meta', default='results/nuc/transcript_meta.tsv')
     ap.add_argument('--copylike', default='results/nuc_clusters/copylike_cluster.tsv')
+    ap.add_argument('--exact', default='', help='Optional cluster pairs for exact duplicates (rep\tmember)')
     ap.add_argument('--outdir', default='results/nuc_clusters')
     args = ap.parse_args()
 
     outdir = Path(args.outdir); outdir.mkdir(parents=True, exist_ok=True)
     pairs_copy = load_pairs(Path(args.copylike))
+    pairs_exact = load_pairs(Path(args.exact)) if args.exact else pd.DataFrame(columns=['rep','member'])
     meta = load_meta(Path(args.meta))
     if not pairs_copy.empty:
         members_copy = build_members(pairs_copy, meta)
@@ -88,9 +94,18 @@ def main():
         cross_gene_views(members_copy, outdir, prefix='copylike')
     else:
         copy_sum = pd.DataFrame()
-    write_html(copy_sum, out_html=outdir / 'nucleotide_clusters_report.html')
+
+    if not pairs_exact.empty:
+        members_exact = build_members(pairs_exact, meta)
+        members_exact.to_csv(outdir / 'exact_members.tsv', sep='\t', index=False)
+        exact_sum = summarize(members_exact)
+        exact_sum.to_csv(outdir / 'exact_summary.tsv', sep='\t', index=False)
+        cross_gene_views(members_exact, outdir, prefix='exact')
+    else:
+        exact_sum = pd.DataFrame()
+
+    write_html(copy_sum, exact_sum, out_html=outdir / 'nucleotide_clusters_report.html')
     print('Wrote', outdir)
 
 if __name__ == '__main__':
     main()
-
