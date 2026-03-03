@@ -1,0 +1,14 @@
+name: nucid
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - pip
+  - biopython>=1.83
+  - pandas>=2.0
+  - cd-hit
+  - mmseqs2  # optional; cluster falls back to cd-hit-est if absent
+  - pip:
+      - mmh3>=4.1.0
+
